@@ -92,7 +92,8 @@ class Vehicle(pygame.sprite.Sprite):
         self.front_area = 2.2  # m^2 # TODO: implement complex drag
 
         # rolling resistance
-        self.rolling_resistance_coefficient = 0.03  # approximation from paper. Added a bit since they only estimate wheel resistance: https://www.matec-conferences.org/articles/matecconf/pdf/2019/03/matecconf_mms18_01005.pdf
+        self.rolling_resistance_coefficient = self.drag_coefficient * 30  # guide says "30 * drag coefficient"
+        # Paper estimate of wheel resistance: https://www.matec-conferences.org/articles/matecconf/pdf/2019/03/matecconf_mms18_01005.pdf
 
         # forces (all N * m)
         self.force_traction = pygame.math.Vector2(0, 0)
