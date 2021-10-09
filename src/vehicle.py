@@ -31,6 +31,7 @@ class World:
         self.air_density = air_density
         self.gravity = gravity
         self.FPS = FPS
+        self.frame_counter = 0
 
 
 # Much knowledge from https://asawicki.info/Mirror/Car%20Physics%20for%20Games/Car%20Physics%20for%20Games.html
@@ -65,7 +66,7 @@ class Vehicle(pygame.sprite.Sprite):
         self.turning_left = False
         self.turning_right = False
 
-        # parameters
+        # size, position, orientation and derivatives
         self.real_length = car_actual_length  # In meters. We use this to determine the pixels per meter scaling for the world
         self.length = self.original_size * self.scale  # length in pixels
         dprint(debug, f'Car pixel length.: {self.length}')
@@ -75,10 +76,16 @@ class Vehicle(pygame.sprite.Sprite):
         self.velocity = pygame.math.Vector2(0, 0)  # m^s
         self.acceleration = pygame.math.Vector2(0, 0)  # m/s^2
         self.speed = 0
+        self.orientation = pygame.math.Vector2(0, 1)  # direction vector u
+
+        # engine and transmission
         self.mass = mass  # kg
         self.engine_force = 0  # N*m
         self.engine_force_max = 650  # N * m
-        self.orientation = pygame.math.Vector2(0, 1)  # direction vector u
+        self.gear_ratio = 2.91  # C8
+        self.differential_ratio = 4.9  # C8 "Final drive ratio"
+        self.transmission_efficiency = 0.7  # %
+        self.wheel_radius = 0.34  # meters
 
         # air drag
         self.drag_coefficient = 0.3  # C_d (from corvette example)
@@ -105,28 +112,38 @@ class Vehicle(pygame.sprite.Sprite):
 
         self.calculate_position()
         self.draw()
+        self.world.frame_counter += 1
 
     def calculate_position(self):
         self.speed = self.velocity.magnitude()
-        # dprint(debug, f'Speed: {self.speed}')
-        self.force_traction = self.orientation * self.engine_force_max * self.throttle
-        # dprint(debug, f'Traction force: {self.force_traction}')
+        self.force_traction = (self.orientation * self.engine_force_max
+                               * self.throttle * self.gear_ratio * self.differential_ratio
+                               * self.transmission_efficiency) / self.wheel_radius
         self.force_drag = -self.drag_coefficient * self.velocity * self.speed
-        # dprint(debug, f'Drag force: {self.force_drag}')
         self.force_rolling_resistance = -self.rolling_resistance_coefficient * self.velocity
-        # dprint(debug, f'Rolling Resistance force: {self.force_rolling_resistance}')
 
         # calculate changes in vehicle position (euler method numerical integration)
         # TODO: upgrade to Runge-Kutta integration
         total_force: pygame.math.Vector2 = self.force_traction + self.force_drag + self.force_rolling_resistance
-        # dprint(debug, f'Total force: {total_force}')
         self.acceleration = total_force / self.mass
-        # dprint(debug, f'Acceleration: {self.acceleration}')
         self.velocity += self.acceleration * self.world.time_step_size
-        dprint(debug, f'Velocity: {self.velocity}')
         # scale adjustment converts the position we calculated in meters to the screen position in pixels
         self.position += self.velocity * self.world.time_step_size * self.scale_adjustment
-        # dprint(debug, f'Position: {self.position}')
+
+        # debug printing
+        dprint(debug, f'Clock Tick: {self.world.frame_counter}')
+        dprint(debug, f'Seconds elapsed: {self.world.frame_counter / 30}')
+        dprint(debug, f'Speed: {self.speed} m/s')
+        dprint(debug, f'Speed: {self.speed * 2.237} mph')
+        dprint(debug, f'Total force: {total_force} N')
+        dprint(debug, f'Acceleration: {self.acceleration} m/s^2')
+        dprint(debug, f'Velocity: {self.velocity} m/s')
+        dprint(debug, f'Position: {self.position} m')
+
+        dprint(debug, f'Traction force: {self.force_traction}')
+        dprint(debug, f'Drag force: {self.force_drag}')
+        dprint(debug, f'Rolling Resistance force: {self.force_rolling_resistance}\n')
+
 
     def draw(self):
         self.rect.center = self.position
